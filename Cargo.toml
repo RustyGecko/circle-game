@@ -1,0 +1,11 @@
+[package]
+name = "circle-game"
+version = "0.1.0"
+authors = ["Sondre Lefsaker <sondrele@stud.ntnu.no>"]
+
+[target.thumbv7m-none-eabi.dependencies.emlib]
+git = "https://github.com/RustyGecko/emlib.git"
+features = ["dk3750"]
+
+[target.thumbv7m-none-eabi.dependencies.core]
+git = "https://github.com/RustyGecko/rust-core.git"
