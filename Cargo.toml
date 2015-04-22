@@ -9,3 +9,6 @@ features = ["dk3750"]
 
 [target.thumbv7m-none-eabi.dependencies.core]
 git = "https://github.com/RustyGecko/rust-core.git"
+
+[target.thumbv7m-none-eabi.dependencies.rand]
+git = "https://github.com/RustyGecko/rust-rand.git"

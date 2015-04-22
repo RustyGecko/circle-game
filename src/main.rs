@@ -3,13 +3,17 @@
 #![warn(warnings)]
 #![allow(unsigned_negation)]
 #![feature(lang_items, core, no_std, asm)]
-#![feature(negate_unsigned)]
+#![feature(negate_unsigned, rand)]
 
 #[macro_use(assert, panic)]
 extern crate core;
 extern crate emlib;
+extern crate rand;
 
 use core::prelude::*;
+use core::intrinsics::volatile_load;
+
+use rand::{Rng, SeedableRng};
 
 use emlib::ebi;
 use emlib::cmu;
@@ -27,11 +31,6 @@ static mut circle_offsets: [i32; CIRCLE_SAMPLES] = [0; CIRCLE_SAMPLES];
 pub mod gamepad;
 pub mod utils;
 pub mod display;
-
-//TODO: Replace with actual rand()
-fn rand() -> i32 {
-    1
-}
 
 #[no_mangle]
 pub extern fn main() {
@@ -99,7 +98,9 @@ fn init() {
 }
 
 fn run() {
-    let mut env: GameEnv = restart(0);
+
+    let mut random_number_generator = rand::ChaChaRng::from_seed(&[get_cycle_count()]);
+    let mut env: GameEnv = restart(0, &mut random_number_generator);
 
     loop {
         // Clear any gpio interrupts
@@ -152,11 +153,11 @@ fn run() {
         detect_circle_collision(&mut env, old_rect1, old_rect2);
 
         if detect_collission(&env, env.circle1.rect) || detect_collission(&env, env.circle2.rect) {
-            env = restart(env.max_score);
+            env = restart(env.max_score, &mut random_number_generator);
             continue;
         }
 
-        update_obstacle(&mut env);
+        update_obstacle(&mut env, &mut random_number_generator);
 
         draw_circle(&env.circle1);
         increment_color(&mut env.circle1, 2000);
@@ -169,7 +170,7 @@ fn run() {
     }
 }
 
-fn restart(max_score: u32) -> GameEnv {
+fn restart<R: Rng>(max_score: u32, rng: &mut R) -> GameEnv {
     display::clear();
 
     let circle1 = Circle {
@@ -195,7 +196,7 @@ fn restart(max_score: u32) -> GameEnv {
         color: 12000,
     };
 
-    let obstacle = generate_obstacle();
+    let obstacle = generate_obstacle(rng);
 
     GameEnv {
         circle1: circle1,
@@ -359,7 +360,7 @@ fn detect_collission(env: &GameEnv, rect: Rectangle) -> bool {
     false
 }
 
-fn generate_obstacle() -> Obstacle {
+fn generate_obstacle<R: Rng>(rng: &mut R) -> Obstacle {
     let mut obstacle = Obstacle {
         rect: Rectangle {
             dx: 0,
@@ -373,15 +374,16 @@ fn generate_obstacle() -> Obstacle {
         gap2: None,
     };
 
-    let generate_gap2 = rand() % 2 == 1;
+
+    let generate_gap2 = rng.gen::<bool>();
     let gap_size = if generate_gap2 { 70 } else { 90 };
     let gap_area = if generate_gap2 { 90 } else { 230 };
 
-    obstacle.gap1.0 = 70 + rand() % gap_area;
+    obstacle.gap1.0 = rng.gen_range(0, gap_area);
     obstacle.gap1.1 = obstacle.gap1.0 + gap_size + 1;
 
     if generate_gap2 {
-        let gap2_start = 160 + rand() % gap_area;
+        let gap2_start = 160 + rng.gen_range(0, gap_area);
         obstacle.gap2 = Some((gap2_start, gap2_start + gap_size + 1));
     }
 
@@ -402,7 +404,7 @@ fn generate_obstacle() -> Obstacle {
     obstacle
 }
 
-fn update_obstacle(env: &mut GameEnv) {
+fn update_obstacle<R: Rng>(env: &mut GameEnv, rng: &mut R) {
     env.obstacle.rect.dy = env.frame - 2;
     if env.obstacle.rect.dy < 0 {
         env.obstacle.rect.dy = 0;
@@ -417,7 +419,7 @@ fn update_obstacle(env: &mut GameEnv) {
         }
 
         env.frame = 1;
-        env.obstacle = generate_obstacle();
+        env.obstacle = generate_obstacle(rng);
     }
 
     let mut buf = display::frame_buffer::<u16>();
@@ -434,5 +436,12 @@ fn update_obstacle(env: &mut GameEnv) {
                 buf[env.obstacle.pos + i - 3 * display::V_WIDTH as usize] = 0;
             }
         }
+    }
+}
+
+fn get_cycle_count() -> u32 {
+    unsafe {
+        let dwt_cyccnt: *mut u32 = 0xE0001004 as *mut u32;
+        volatile_load(dwt_cyccnt)
     }
 }
