@@ -2,7 +2,7 @@ language: rust
 sudo: required
 
 install:
-  - .travis.install.deps.sh
+  - sh ./.travis.install.deps.sh
 
 before_script:
   - export PATH=$PATH:`pwd`/cargo-linkargs/target/debug
