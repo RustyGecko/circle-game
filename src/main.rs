@@ -7,8 +7,10 @@
 
 #[macro_use(assert, panic)]
 extern crate core;
-extern crate emlib;
 extern crate rand;
+
+extern crate cmsis;
+extern crate emlib;
 
 use core::prelude::*;
 use core::intrinsics::volatile_load;
@@ -18,7 +20,6 @@ use rand::{Rng, SeedableRng};
 use emlib::ebi;
 use emlib::cmu;
 use emlib::gpio;
-use emlib::cmsis;
 
 use emlib::dk::{bc, bsp};
 
