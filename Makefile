@@ -2,16 +2,18 @@ LINKARGS = "-mthumb -mcpu=cortex-m3 -Tefm32gg.ld --specs=nosys.specs -lgcc -lc -
 
 OBJCOPY = arm-none-eabi-objcopy
 
-
 OUT=circle-game
 
 DEBUG_DIR=target/thumbv7m-none-eabi/debug
+DEBUG_OUT=$(DEBUG_DIR)/$(OUT)
+
+.PHONY: all example clean
 
 all: debug
 
-debug: $(DEBUG_DIR)/$(OUT) $(DEBUG_DIR)/$(OUT).hex $(DEBUG_DIR)/$(OUT).bin $(DEBUG_DIR)/$(OUT).axf
+debug: $(DEBUG_OUT).elf $(DEBUG_OUT).hex $(DEBUG_OUT).bin $(DEBUG_OUT).axf
 
-$(DEBUG_DIR)/$(OUT): src/main.rs
+%.elf:
 	cargo linkargs $(LINKARGS) --target thumbv7m-none-eabi --verbose
 
 %.hex: %
@@ -22,3 +24,6 @@ $(DEBUG_DIR)/$(OUT): src/main.rs
 
 %.axf: %
 	$(OBJCOPY) $< $@
+
+clean:
+	cargo clean

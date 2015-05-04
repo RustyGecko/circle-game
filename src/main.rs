@@ -7,11 +7,12 @@
 
 #[macro_use(assert, panic)]
 extern crate core;
+extern crate rand;
+
 extern crate cmsis;
 extern crate emlib;
 extern crate emdrv;
 extern crate kits;
-extern crate rand;
 
 use core::prelude::*;
 use core::intrinsics::volatile_load;
