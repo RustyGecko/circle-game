@@ -16,7 +16,6 @@ features = ["dk3750"]
 
 [target.thumbv7m-none-eabi.dependencies.emlib]
 git = "https://github.com/RustyGecko/emlib.git"
-features = ["dk3750"]
 
 [target.thumbv7m-none-eabi.dependencies.core]
 git = "https://github.com/RustyGecko/rust-core.git"
