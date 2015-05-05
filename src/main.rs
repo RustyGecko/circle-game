@@ -11,6 +11,8 @@ extern crate rand;
 
 extern crate cmsis;
 extern crate emlib;
+extern crate emdrv;
+extern crate kits;
 
 use core::prelude::*;
 use core::intrinsics::volatile_load;
@@ -21,7 +23,7 @@ use emlib::ebi;
 use emlib::cmu;
 use emlib::gpio;
 
-use emlib::dk::{bc, bsp};
+use kits::dk::{bc, bsp};
 
 const CIRCLE_SAMPLES: usize = 4 + 33 * 4;
 static CIRCLE_Y: [i32; 35] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,20,21,21,22,22,23,23,23,23,24,24,24,24,24];

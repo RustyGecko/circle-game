@@ -1,4 +1,4 @@
-use emlib::dk::bsp;
+use kits::dk::bsp;
 
 static mut ms_ticks: u32 = 0;
 

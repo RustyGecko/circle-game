@@ -3,12 +3,19 @@ name = "circle-game"
 version = "0.1.0"
 authors = ["Sondre Lefsaker <sondrele@stud.ntnu.no>"]
 
+[target.thumbv7m-none-eabi.dependencies.kits]
+git = "https://github.com/RustyGecko/kits.git"
+features = ["dk3750"]
+
 [target.thumbv7m-none-eabi.dependencies.cmsis]
 git = "https://github.com/RustyGecko/cmsis.git"
 
+[target.thumbv7m-none-eabi.dependencies.emdrv]
+git = "https://github.com/RustyGecko/emdrv.git"
+features = ["dk3750"]
+
 [target.thumbv7m-none-eabi.dependencies.emlib]
 git = "https://github.com/RustyGecko/emlib.git"
-features = ["dk3750"]
 
 [target.thumbv7m-none-eabi.dependencies.core]
 git = "https://github.com/RustyGecko/rust-core.git"

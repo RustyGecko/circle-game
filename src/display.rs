@@ -2,7 +2,8 @@ use core::slice::from_raw_parts_mut;
 
 use emlib::ebi;
 use emlib::ebi::{TFTInit};
-use emlib::emdrv::tft;
+
+use emdrv::tft;
 
 use cmsis::nvic;
 
