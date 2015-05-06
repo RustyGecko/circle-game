@@ -24,6 +24,10 @@ use emlib::gpio;
 
 use kits::dk::{bc, bsp};
 
+const BENCHMARK_MODE: bool = true;
+static mut LAST_FRAME_COUNT: u32 = 0;
+static mut FRAME_COUNT: u32 = 0;
+
 const CIRCLE_SAMPLES: usize = 4 + 33 * 4;
 static CIRCLE_Y: [i32; 35] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,20,21,21,22,22,23,23,23,23,24,24,24,24,24];
 static CIRCLE_X: [i32; 35] = [24,24,24,24,24,23,23,23,23,22,22,21,21,20,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
@@ -108,11 +112,17 @@ fn run() {
         let flags = gpio::int_get();
         gpio::int_clear(flags);
 
-        // Read status of gpio pins
-        let buttons = gpio::port_in_get(gpio::Port::C);
-
         let old_rect1: Rectangle = env.circle1.rect;
         clear_circle(&env.circle1);
+
+
+        let buttons = if BENCHMARK_MODE {
+            // Simulate buttons with AI
+            get_simulate_buttons(&env)
+        } else {
+            // Read status of gpio pins
+            gpio::port_in_get(gpio::Port::C)
+        };
 
         if buttons & 0x1 == 0 && env.circle1.rect.dx > 0 {
             env.circle1.center -= 1;
@@ -168,6 +178,10 @@ fn run() {
 
         display::draw_number(env.score as usize, 250 + 10 * display::V_WIDTH, 0xffff);
         display::draw_number(env.max_score as usize, 276 + 10 * display::V_WIDTH, 0x2ee0);
+
+        unsafe { FRAME_COUNT += 1; };
+
+        display::draw_fps(unsafe { LAST_FRAME_COUNT });
     }
 }
 
@@ -440,9 +454,116 @@ fn update_obstacle<R: Rng>(env: &mut GameEnv, rng: &mut R) {
     }
 }
 
+fn get_simulate_buttons(env: &GameEnv) -> u32 {
+
+    // The y coordinate of the obstical is given by the frame counter in the GameEnv
+    let gap_y = env.frame;
+
+    let (gap_1_start, gap_1_end) = env.obstacle.gap1;
+    let gap1 = ((gap_1_start + gap_1_end) / 2, gap_y);
+
+    match env.obstacle.gap2 {
+        Some((gap_2_start, gap_2_end)) => {
+            let gap2 = ((gap_2_start + gap_2_end) / 2, gap_y);
+
+            let diff1_1 = distance(&env.circle1, gap1);
+            let diff2_1 = distance(&env.circle2, gap1);
+            let diff1_2 = distance(&env.circle1, gap2);
+            let diff2_2 = distance(&env.circle2, gap2);
+
+            if diff1_1 > diff1_2 && diff2_1 > diff2_2 {
+                both_go_to_gap(env, gap2)
+            } else if diff1_1 < diff1_2 && diff2_1 < diff2_2 {
+                both_go_to_gap(env, gap1)
+            } else if diff1_1 < diff1_2 {
+                go_to_gap(env, 0, gap1) | go_to_gap(env, 1, gap2)
+            } else {
+                go_to_gap(env, 0, gap2) | go_to_gap(env, 1, gap1)
+            }
+        },
+        None => both_go_to_gap(env, gap1)
+    }
+
+}
+
+fn distance(circle: &Circle, gap: (i32,i32)) -> i32 {
+    let x = circle.rect.dx + 25;
+    let y = circle.rect.dy + 25;
+    let (g_x, g_y) = gap;
+
+    let pow_2 = |a| a * a;
+
+    pow_2(x - g_x) + pow_2(y - g_y)
+}
+
+fn both_go_to_gap(env: &GameEnv, gap: (i32, i32)) -> u32 {
+
+    let mut buttons = 0;
+
+    // Move circle 1 on x axis
+    if (env.circle1.rect.dx + 25) < gap.0 {
+        buttons |= 0x4;
+    } else {
+        buttons |= 0x1;
+    }
+
+    // Move circle 2 on x axis
+    if (env.circle2.rect.dx + 25) < gap.0 {
+        buttons |= 0x40;
+    } else {
+        buttons |= 0x10;
+    }
+
+    let diff1 = distance(&env.circle1, gap);
+    let diff2 = distance(&env.circle2, gap);
+
+    if diff1 < diff2 {
+        buttons |= 0x80;
+        if (env.circle1.rect.dy + 25) > 165 {
+            buttons |= 0x2;
+        }
+    } else {
+        buttons |= 0x8;
+        if (env.circle2.rect.dy + 25) > 165 {
+            buttons |= 0x20;
+        }
+    }
+
+    buttons
+}
+
+fn go_to_gap(env: &GameEnv, circle: u32, gap: (i32, i32)) -> u32 {
+
+    let gap_x = gap.0;
+
+    if circle == 0 {
+        let x = env.circle1.rect.dx + 25;
+        0x8 | if x < gap_x { 0x4 } else { 0x1 }
+    } else {
+        let x = env.circle2.rect.dx + 25;
+        0x80 | if x < gap_x { 0x40 } else { 0x10 }
+    }
+
+}
+
 fn get_cycle_count() -> u32 {
     unsafe {
         let dwt_cyccnt: *mut u32 = 0xE0001004 as *mut u32;
         volatile_load(dwt_cyccnt)
+    }
+}
+
+#[no_mangle]
+pub extern fn on_systick(ms_ticks: u32) {
+
+    if BENCHMARK_MODE {
+
+        if ms_ticks % 1000 == 0 {
+
+            unsafe {
+                LAST_FRAME_COUNT = FRAME_COUNT;
+                FRAME_COUNT = 0
+            };
+        }
     }
 }
