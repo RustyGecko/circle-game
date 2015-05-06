@@ -1,5 +1,4 @@
 #![no_std]
-#![no_main]
 #![warn(warnings)]
 #![allow(unsigned_negation)]
 #![feature(lang_items, core, no_std, asm)]
@@ -35,8 +34,7 @@ pub mod gamepad;
 pub mod utils;
 pub mod display;
 
-#[no_mangle]
-pub extern fn main() {
+fn main() {
     bsp::init(bsp::EBI);
     init();
     run();
