@@ -2,10 +2,16 @@ use kits::dk::bsp;
 
 static mut ms_ticks: u32 = 0;
 
+extern {
+    fn on_systick(ms_ticks: u32);
+}
+
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern fn SysTick_Handler() {
     ms_ticks += 1;
+
+    on_systick(ms_ticks);
 }
 
 pub fn delay(num_ticks: u32) {

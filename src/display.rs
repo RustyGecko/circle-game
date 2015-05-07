@@ -237,6 +237,8 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
     }
 }
 
+pub fn draw_fps(_: u32) {}
+
 pub fn debug_count() {
     let mut num = 999;
     loop {

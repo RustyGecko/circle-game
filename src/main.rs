@@ -24,6 +24,10 @@ use emlib::gpio;
 
 use kits::dk::{bc, bsp};
 
+const BENCHMARK_MODE: bool = true;
+static mut LAST_FRAME_COUNT: u32 = 0;
+static mut FRAME_COUNT: u32 = 0;
+
 const CIRCLE_SAMPLES: usize = 4 + 33 * 4;
 static CIRCLE_Y: [i32; 35] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,20,21,21,22,22,23,23,23,23,24,24,24,24,24];
 static CIRCLE_X: [i32; 35] = [24,24,24,24,24,23,23,23,23,22,22,21,21,20,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
@@ -33,6 +37,7 @@ static mut circle_offsets: [i32; CIRCLE_SAMPLES] = [0; CIRCLE_SAMPLES];
 pub mod gamepad;
 pub mod utils;
 pub mod display;
+pub mod ai;
 
 fn main() {
     bsp::init(bsp::EBI);
@@ -108,11 +113,17 @@ fn run() {
         let flags = gpio::int_get();
         gpio::int_clear(flags);
 
-        // Read status of gpio pins
-        let buttons = gpio::port_in_get(gpio::Port::C);
-
         let old_rect1: Rectangle = env.circle1.rect;
         clear_circle(&env.circle1);
+
+
+        let buttons = if BENCHMARK_MODE {
+            // Simulate buttons with AI
+            ai::get_simulate_buttons(&env)
+        } else {
+            // Read status of gpio pins
+            gpio::port_in_get(gpio::Port::C)
+        };
 
         if buttons & 0x1 == 0 && env.circle1.rect.dx > 0 {
             env.circle1.center -= 1;
@@ -168,6 +179,10 @@ fn run() {
 
         display::draw_number(env.score as usize, 250 + 10 * display::V_WIDTH, 0xffff);
         display::draw_number(env.max_score as usize, 276 + 10 * display::V_WIDTH, 0x2ee0);
+
+        unsafe { FRAME_COUNT += 1; };
+
+        display::draw_fps(unsafe { LAST_FRAME_COUNT });
     }
 }
 
@@ -444,5 +459,20 @@ fn get_cycle_count() -> u32 {
     unsafe {
         let dwt_cyccnt: *mut u32 = 0xE0001004 as *mut u32;
         volatile_load(dwt_cyccnt)
+    }
+}
+
+#[no_mangle]
+pub extern fn on_systick(ms_ticks: u32) {
+
+    if BENCHMARK_MODE {
+
+        if ms_ticks % 1000 == 0 {
+
+            unsafe {
+                LAST_FRAME_COUNT = FRAME_COUNT;
+                FRAME_COUNT = 0
+            };
+        }
     }
 }
