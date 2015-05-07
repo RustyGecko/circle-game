@@ -2,11 +2,14 @@
 #![warn(warnings)]
 #![allow(unsigned_negation)]
 #![feature(lang_items, core, no_std, asm)]
-#![feature(negate_unsigned, rand)]
+#![feature(negate_unsigned, rand, collections)]
 
 #[macro_use(assert, panic)]
 extern crate core;
 extern crate rand;
+
+#[macro_use]
+extern crate collections;
 
 extern crate cmsis;
 extern crate emlib;
@@ -41,6 +44,7 @@ pub mod utils;
 pub mod display;
 pub mod ai;
 pub mod prand;
+pub mod font16x28;
 
 fn main() {
     bsp::init(bsp::EBI);
@@ -84,7 +88,8 @@ fn init() {
     cmu::clock_select_set(cmu::Clock::HF, cmu::Select::HFXO);
 
     // Setup SysTick Timer for 1 msec interrupts
-    if cmsis::sys_tick::config(cmu::clock_freq_get(cmu::Clock::CORE) / 1000) != 0 {
+    let freq = cmu::clock_freq_get(cmu::Clock::CORE);
+    if cmsis::sys_tick::config(freq / 1000) != 0 {
         loop {}
     }
 
