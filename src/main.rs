@@ -16,7 +16,9 @@ extern crate kits;
 use core::prelude::*;
 use core::intrinsics::volatile_load;
 
-use rand::{Rng, SeedableRng};
+use rand::Rng;
+
+use prand::PRandom;
 
 use emlib::ebi;
 use emlib::cmu;
@@ -38,6 +40,7 @@ pub mod gamepad;
 pub mod utils;
 pub mod display;
 pub mod ai;
+pub mod prand;
 
 fn main() {
     bsp::init(bsp::EBI);
@@ -105,7 +108,8 @@ fn init() {
 
 fn run() {
 
-    let mut random_number_generator = rand::ChaChaRng::from_seed(&[get_cycle_count()]);
+    let mut random_number_generator = PRandom::new();
+
     let mut env: GameEnv = restart(0, &mut random_number_generator);
 
     loop {
@@ -452,13 +456,6 @@ fn update_obstacle<R: Rng>(env: &mut GameEnv, rng: &mut R) {
                 buf[env.obstacle.pos + i - 3 * display::V_WIDTH as usize] = 0;
             }
         }
-    }
-}
-
-fn get_cycle_count() -> u32 {
-    unsafe {
-        let dwt_cyccnt: *mut u32 = 0xE0001004 as *mut u32;
-        volatile_load(dwt_cyccnt)
     }
 }
 
