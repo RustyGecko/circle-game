@@ -1,4 +1,5 @@
 use core::slice::from_raw_parts_mut;
+use collections::string::String;
 
 use emlib::ebi;
 use emlib::ebi::{TFTInit};
@@ -8,6 +9,8 @@ use emdrv::tft;
 use cmsis::nvic;
 
 use utils;
+
+use font16x28::FONT_16X28;
 
 pub const WIDTH: usize = 320;
 pub const HEIGHT: usize = 240;
@@ -191,19 +194,19 @@ pub fn clear() {
 
     // It is cleaner to treat the framebuffer like an array, but it might be slower due to
     // bounds checking, so probably not the optimal solution.
-    let mut buf = frame_buffer::<u32>();
-    for i in 0 .. buf.len() {
-        buf[i] = 0x00000000;
-    }
+    // let mut buf = frame_buffer::<u32>();
+    // for i in 0 .. buf.len() {
+    //     buf[i] = 0x00000000;
+    // }
 
     // Alternate solution:
-    // let mut framebuffer: *mut u32 = ebi::bank_address(ebi::BANK2) as *mut u32;
-    // for i in 0 .. ((V_WIDTH * V_HEIGHT) / 2) {
-    //     unsafe {
-    //         *framebuffer = 0x00000000;
-    //         framebuffer = framebuffer.offset(1);
-    //     }
-    // }
+    let mut framebuffer: *mut u32 = ebi::bank_address(ebi::BANK2) as *mut u32;
+    for _ in 0 .. ((V_WIDTH * V_HEIGHT) / 2) {
+        unsafe {
+            *framebuffer = 0x00000000;
+            framebuffer = framebuffer.offset(1);
+        }
+    }
 }
 
 pub fn draw_number(number: usize, mut pos: usize, color: u16) {
@@ -237,7 +240,42 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
     }
 }
 
-pub fn draw_fps(_: u32) {}
+pub fn draw_fps(fps: u32) {
+    let text = format!("{} fps", fps);
+    draw_string(0, 10, text);
+}
+
+fn draw_string(mut x: usize, y: usize, text: String) {
+
+    for ch in text.chars() {
+        draw_font(x, y, ch);
+        x += 16;
+    }
+}
+
+fn draw_font(x: usize, y: usize, c: char) {
+
+    let font = &FONT_16X28;
+
+    let buf = frame_buffer::<u16>();
+    let font_offset = c as usize - 0x20;
+    let mut idx = x + (y*V_WIDTH);
+
+    for j in 0..font.c_height {
+
+        for i in 0..font.c_width {
+
+            let color = font.data[j * font.width + font_offset * font.c_width + i];
+
+            buf[idx] = color;
+            idx += 1;
+        }
+
+        idx += V_WIDTH - font.c_width;
+
+    }
+
+}
 
 pub fn debug_count() {
     let mut num = 999;
