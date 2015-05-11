@@ -12,8 +12,6 @@ The game is dependant on [emlib](https://github.com/RustyGecko/emlib.git) and wo
 an example application of using the library together with the DK3750.
 
 The following dependencies need to be installed:
-* [cargo-linkargs](https://github.com/RustyGecko/cargo-linkargs) - A Cargo subcommand used to link 
-with an EFM32 linker script
 * [ARM GCC Embedded Toolchain](https://launchpad.net/gcc-arm-embedded) - Used to build 
 Silicon Labs emlib for the EFM32.
 
