@@ -1,4 +1,3 @@
-use core::slice::from_raw_parts_mut;
 use core::intrinsics::volatile_store;
 use collections::string::String;
 
@@ -190,41 +189,30 @@ impl BufferLen for u64 {
     fn buffer_len() -> usize { (V_WIDTH * V_HEIGHT / 4) as usize }
 }
 
-// Treat ebi::BANK2 to a slice of data
-pub fn frame_buffer<'a, T: BufferLen>() -> &'a mut [T] {
-    let address = ebi::bank_address(ebi::BANK2) as *mut T;
-    unsafe { from_raw_parts_mut(address, T::buffer_len()) }
+macro_rules! frame_buffer {
+    () => (ebi::bank_address(ebi::BANK2) as *mut u16)
 }
 
-struct FrameBuffer;
-
-impl FrameBuffer {
-
-		#[inline(always)]
-    fn set(idx: usize, val: u16) {
-
-        assert!(idx < V_WIDTH * V_HEIGHT);
-        let framebuffer = ebi::bank_address(ebi::BANK2) as *mut u16;
+macro_rules! set {
+    ($fb:ident, $i:expr, $val:expr) => {
         unsafe {
-            volatile_store(framebuffer.offset(idx as isize), val);
+            volatile_store($fb.offset($i as isize), $val);
         }
-
     }
-
 }
 
 pub fn clear() {
+    let fb = frame_buffer!();
     // Clear entire display using 32-bit write operations.
-
-    // Alternate solution:
     for i in 0 .. V_WIDTH * V_HEIGHT {
-        FrameBuffer::set(i, 0);
+        set!(fb, i, 0);
     }
 }
 pub fn draw_number(number: usize, mut pos: usize, color: u16) {
     let mut current_score = number;
     pos = pos + 16; // Start with the third position
 
+    let fb = frame_buffer!();
     for _ in 0 .. 3 {
         let num: usize = current_score % 10;
         current_score = current_score / 10;
@@ -234,9 +222,9 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
             for x in 0 .. 3 {
                 let c = if NUMBERS[num][y][x] { color } else { 0 };
 
-                FrameBuffer::set(pos+xx+yy, c);
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
-                FrameBuffer::set(pos+xx+yy, c);
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
             }
             yy += V_WIDTH as usize;
@@ -244,9 +232,9 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
             for x in 0 .. 3 {
                 let c = if NUMBERS[num][y][x] { color } else { 0 };
 
-                FrameBuffer::set(pos+xx+yy, c);
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
-                FrameBuffer::set(pos+xx+yy, c);
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
             }
             yy += V_WIDTH as usize;
@@ -257,23 +245,24 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
 
 #[inline(always)]
 pub fn clear_circle(circle: &Circle) {
-
+    let fb = frame_buffer!();
     for i in 0 .. CIRCLE_SAMPLES {
         let idx = (circle.center as i32 + CIRCLE_OFFSETS[i]) as usize;
         if idx > 0 {
-            FrameBuffer::set(idx, 0);
+            set!(fb, idx, 0);
         }
     }
 }
 
 #[inline(always)]
 pub fn draw_circle(circle: &Circle) {
+    let fb = frame_buffer!();
     let mut color = circle.color;
 
     for i in 0 .. CIRCLE_SAMPLES {
         let idx = (circle.center as i32 + CIRCLE_OFFSETS[i]) as usize;
         if idx > 0 {
-            FrameBuffer::set(idx, color);
+            set!(fb, idx, color);
             color += 32;
         }
     }
@@ -281,20 +270,19 @@ pub fn draw_circle(circle: &Circle) {
 
 #[inline(always)]
 pub fn draw_obstacle(obstacle: &Obstacle) {
-
+    let fb = frame_buffer!();
     for i in 0..WIDTH {
-
         if obstacle.obstacle[i] {
-            FrameBuffer::set(obstacle.pos + i, 63488);
+            set!(fb, obstacle.pos + i, 63488);
 
             if obstacle.pos >= 600 {
-                FrameBuffer::set(obstacle.pos + i - 1 * V_WIDTH as usize, 57344);
+                set!(fb, obstacle.pos + i - 1 * V_WIDTH as usize, 57344);
             }
             if obstacle.pos >= 1200 {
-                FrameBuffer::set(obstacle.pos + i - 2 * V_WIDTH as usize, 64);
+                set!(fb, obstacle.pos + i - 2 * V_WIDTH as usize, 64);
             }
             if obstacle.pos >= 2000 {
-                FrameBuffer::set(obstacle.pos + i - 3 * V_WIDTH as usize, 0);
+                set!(fb, obstacle.pos + i - 3 * V_WIDTH as usize, 0);
             }
         }
 
@@ -318,7 +306,7 @@ fn draw_string(mut x: usize, y: usize, text: String) {
 }
 
 fn draw_font(x: usize, y: usize, c: char) {
-
+    let fb = frame_buffer!();
     let font = &FONT_16X28;
     let font_offset = c as usize - 0x20;
     let mut idx = x + (y*V_WIDTH);
@@ -329,7 +317,7 @@ fn draw_font(x: usize, y: usize, c: char) {
         for i in 0..font.c_width {
 
             let color = font.data[j * font.width + font_offset * font.c_width + i];
-            FrameBuffer::set(idx, color);
+            set!(fb, idx, color);
             idx += 1;
         }
 
