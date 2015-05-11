@@ -1,4 +1,4 @@
-use core::slice::from_raw_parts_mut;
+use core::intrinsics::volatile_store;
 use collections::string::String;
 
 use emlib::ebi;
@@ -10,6 +10,8 @@ use cmsis::nvic;
 
 use utils;
 
+use {Circle, Obstacle};
+
 use font16x28::FONT_16X28;
 
 pub const WIDTH: usize = 320;
@@ -18,6 +20,10 @@ pub const HEIGHT: usize = 240;
 // Virtual width and height
 pub const V_WIDTH: usize = 672;
 pub const V_HEIGHT: usize = 240;
+
+pub const CIRCLE_SAMPLES: usize = 4 + 33 * 4;
+
+pub const CIRCLE_OFFSETS: [i32; CIRCLE_SAMPLES] = [-24,-696,-1368,-2040,-2712,-3383,-4055,-4727,-5399,-6070,-6742,-7413,-8085,-8756,-9428,-10099,-10770,-11441,-12112,-12783,-13454,-13453,-14124,-14123,-14794,-14793,-15464,-15463,-15462,-15461,-16132,-16131,-16130,-16129,-16128,-16127,-16126,-16125,-16124,-15451,-15450,-15449,-15448,-14775,-14774,-14101,-14100,-13427,-13426,-12753,-12080,-11407,-10734,-10061,-9388,-8716,-8043,-7371,-6698,-6026,-5353,-4681,-4009,-3337,-2664,-1992,-1320,-648,24,696,1368,2040,2712,3383,4055,4727,5399,6070,6742,7413,8085,8756,9428,10099,10770,11441,12112,12783,13454,13453,14124,14123,14794,14793,15464,15463,15462,15461,16132,16131,16130,16129,16128,16127,16126,16125,16124,15451,15450,15449,15448,14775,14774,14101,14100,13427,13426,12753,12080,11407,10734,10061,9388,8716,8043,7371,6698,6026,5353,4681,4009,3337,2664,1992,1320,648];
 
 pub static TFT_INIT: TFTInit = TFTInit {
     bank:            ebi::TFTBank::_2,
@@ -183,37 +189,30 @@ impl BufferLen for u64 {
     fn buffer_len() -> usize { (V_WIDTH * V_HEIGHT / 4) as usize }
 }
 
-// Treat ebi::BANK2 to a slice of data
-pub fn frame_buffer<'a, T: BufferLen>() -> &'a mut [T] {
-    let address = ebi::bank_address(ebi::BANK2) as *mut T;
-    unsafe { from_raw_parts_mut(address, T::buffer_len()) }
+macro_rules! frame_buffer {
+    () => (ebi::bank_address(ebi::BANK2) as *mut u16)
 }
 
-pub fn clear() {
-    // Clear entire display using 32-bit write operations.
-
-    // It is cleaner to treat the framebuffer like an array, but it might be slower due to
-    // bounds checking, so probably not the optimal solution.
-    // let mut buf = frame_buffer::<u32>();
-    // for i in 0 .. buf.len() {
-    //     buf[i] = 0x00000000;
-    // }
-
-    // Alternate solution:
-    let mut framebuffer: *mut u32 = ebi::bank_address(ebi::BANK2) as *mut u32;
-    for _ in 0 .. ((V_WIDTH * V_HEIGHT) / 2) {
+macro_rules! set {
+    ($fb:ident, $i:expr, $val:expr) => {
         unsafe {
-            *framebuffer = 0x00000000;
-            framebuffer = framebuffer.offset(1);
+            volatile_store($fb.offset($i as isize), $val);
         }
     }
 }
 
+pub fn clear() {
+    let fb = frame_buffer!();
+    // Clear entire display using 32-bit write operations.
+    for i in 0 .. V_WIDTH * V_HEIGHT {
+        set!(fb, i, 0);
+    }
+}
 pub fn draw_number(number: usize, mut pos: usize, color: u16) {
     let mut current_score = number;
     pos = pos + 16; // Start with the third position
 
-    let mut buf = frame_buffer::<u16>();
+    let fb = frame_buffer!();
     for _ in 0 .. 3 {
         let num: usize = current_score % 10;
         current_score = current_score / 10;
@@ -221,17 +220,21 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
         for y in 0 .. 5 {
             let mut xx: usize = 0;
             for x in 0 .. 3 {
-                buf[pos+xx+yy] = if NUMBERS[num][y][x] { color } else { 0 };
+                let c = if NUMBERS[num][y][x] { color } else { 0 };
+
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
-                buf[pos+xx+yy] = if NUMBERS[num][y][x] { color } else { 0 };
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
             }
             yy += V_WIDTH as usize;
             xx = 0;
             for x in 0 .. 3 {
-                buf[pos+xx+yy] = if NUMBERS[num][y][x] { color } else { 0 };
+                let c = if NUMBERS[num][y][x] { color } else { 0 };
+
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
-                buf[pos+xx+yy] = if NUMBERS[num][y][x] { color } else { 0 };
+                set!(fb, pos+xx+yy, c);
                 xx += 1;
             }
             yy += V_WIDTH as usize;
@@ -240,9 +243,58 @@ pub fn draw_number(number: usize, mut pos: usize, color: u16) {
     }
 }
 
+#[inline(always)]
+pub fn clear_circle(circle: &Circle) {
+    let fb = frame_buffer!();
+    for i in 0 .. CIRCLE_SAMPLES {
+        let idx = (circle.center as i32 + CIRCLE_OFFSETS[i]) as usize;
+        if idx > 0 {
+            set!(fb, idx, 0);
+        }
+    }
+}
+
+#[inline(always)]
+pub fn draw_circle(circle: &Circle) {
+    let fb = frame_buffer!();
+    let mut color = circle.color;
+
+    for i in 0 .. CIRCLE_SAMPLES {
+        let idx = (circle.center as i32 + CIRCLE_OFFSETS[i]) as usize;
+        if idx > 0 {
+            set!(fb, idx, color);
+            color += 32;
+        }
+    }
+}
+
+#[inline(always)]
+pub fn draw_obstacle(obstacle: &Obstacle) {
+    let fb = frame_buffer!();
+    for i in 0..WIDTH {
+        if obstacle.obstacle[i] {
+            set!(fb, obstacle.pos + i, 63488);
+
+            if obstacle.pos >= 600 {
+                set!(fb, obstacle.pos + i - 1 * V_WIDTH as usize, 57344);
+            }
+            if obstacle.pos >= 1200 {
+                set!(fb, obstacle.pos + i - 2 * V_WIDTH as usize, 64);
+            }
+            if obstacle.pos >= 2000 {
+                set!(fb, obstacle.pos + i - 3 * V_WIDTH as usize, 0);
+            }
+        }
+
+    }
+}
 pub fn draw_fps(fps: u32) {
-    let text = format!("{} fps", fps);
-    draw_string(0, 10, text);
+
+		//draw_number(fps as usize, 10 + 10 * V_WIDTH, 0xffff);
+
+		let text = format!("{} fps ", fps);
+		draw_string(0, 10, text);
+
 }
 
 fn draw_string(mut x: usize, y: usize, text: String) {
@@ -254,20 +306,18 @@ fn draw_string(mut x: usize, y: usize, text: String) {
 }
 
 fn draw_font(x: usize, y: usize, c: char) {
-
+    let fb = frame_buffer!();
     let font = &FONT_16X28;
-
-    let buf = frame_buffer::<u16>();
     let font_offset = c as usize - 0x20;
     let mut idx = x + (y*V_WIDTH);
+
 
     for j in 0..font.c_height {
 
         for i in 0..font.c_width {
 
             let color = font.data[j * font.width + font_offset * font.c_width + i];
-
-            buf[idx] = color;
+            set!(fb, idx, color);
             idx += 1;
         }
 
