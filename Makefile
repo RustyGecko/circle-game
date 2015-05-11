@@ -10,7 +10,7 @@ RELEASE_DIR=target/thumbv7m-none-eabi/release
 RELEASE_OUT=$(RELEASE_DIR)/$(OUT)
 
 
-.PHONY: all example clean debug-build release-build opt-all
+.PHONY: all example clean debug-build release-build
 
 all: debug
 
