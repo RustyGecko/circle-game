@@ -5,22 +5,23 @@ OBJCOPY = arm-none-eabi-objcopy
 OUT=circle-game
 
 DEBUG_DIR=target/thumbv7m-none-eabi/debug
-RELEASE_DIR=target/thumbv7m-none-eabi/release
 DEBUG_OUT=$(DEBUG_DIR)/$(OUT)
+RELEASE_DIR=target/thumbv7m-none-eabi/release
+RELEASE_OUT=$(RELEASE_DIR)/$(OUT)
 
 
-.PHONY: all example clean debug-build release-build
+.PHONY: all example clean debug-build release-build opt-all
 
 all: debug
 
 debug: debug-build $(DEBUG_OUT).hex $(DEBUG_OUT).bin $(DEBUG_OUT).axf
-release: release-build $(RELEASE_DIR)/$(OUT).hex $(RELEASE_DIR)/$(OUT).bin $(RELEASE_DIR)/$(OUT).axf
+release: release-build $(RELEASE_OUT).hex $(RELEASE_OUT).bin $(RELEASE_OUT).axf
 
 debug-build:
-	cargo linkargs $(LINKARGS) --target thumbv7m-none-eabi --verbose
+	cargo rustc --target thumbv7m-none-eabi --verbose -- -C link-args=$(LINKARGS)
 
 release-build:
-	cargo linkargs $(LINKARGS) --target thumbv7m-none-eabi --verbose --release
+	cargo rustc --target thumbv7m-none-eabi --verbose --release -- -C link-args=$(LINKARGS)
 
 %.hex: %
 	$(OBJCOPY) -O ihex $< $@
