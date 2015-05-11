@@ -17,7 +17,6 @@ extern crate emdrv;
 extern crate kits;
 
 use core::prelude::*;
-use core::intrinsics::volatile_load;
 
 use rand::Rng;
 
@@ -29,15 +28,11 @@ use emlib::gpio;
 
 use kits::dk::{bc, bsp};
 
+use display::CIRCLE_SAMPLES;
+
 const BENCHMARK_MODE: bool = true;
 static mut LAST_FRAME_COUNT: u32 = 0;
 static mut FRAME_COUNT: u32 = 0;
-
-const CIRCLE_SAMPLES: usize = 4 + 33 * 4;
-static CIRCLE_Y: [i32; 35] = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,20,21,21,22,22,23,23,23,23,24,24,24,24,24];
-static CIRCLE_X: [i32; 35] = [24,24,24,24,24,23,23,23,23,22,22,21,21,20,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0];
-
-static mut circle_offsets: [i32; CIRCLE_SAMPLES] = [0; CIRCLE_SAMPLES];
 
 pub mod gamepad;
 pub mod utils;
@@ -108,7 +103,6 @@ fn init() {
 
     gamepad::init();
 
-    calculate_circle_offsets();
 }
 
 fn run() {
@@ -123,8 +117,7 @@ fn run() {
         gpio::int_clear(flags);
 
         let old_rect1: Rectangle = env.circle1.rect;
-        clear_circle(&env.circle1);
-
+        display::clear_circle(&env.circle1);
 
         let buttons = if BENCHMARK_MODE {
             // Simulate buttons with AI
@@ -152,7 +145,7 @@ fn run() {
         }
 
         let old_rect2: Rectangle = env.circle2.rect;
-        clear_circle(&env.circle2);
+        display::clear_circle(&env.circle2);
 
         if buttons & 0x10 == 0 && env.circle2.rect.dx > 0 {
             env.circle2.center -= 1;
@@ -180,10 +173,10 @@ fn run() {
 
         update_obstacle(&mut env, &mut random_number_generator);
 
-        draw_circle(&env.circle1);
+        display::draw_circle(&env.circle1);
         increment_color(&mut env.circle1, 2000);
 
-        draw_circle(&env.circle2);
+        display::draw_circle(&env.circle2);
         increment_color(&mut env.circle2, 12000);
 
         display::draw_number(env.score as usize, 250 + 10 * display::V_WIDTH, 0xffff);
@@ -233,56 +226,6 @@ fn restart<R: Rng>(max_score: u32, rng: &mut R) -> GameEnv {
     }
 }
 
-fn calculate_circle_offsets() {
-    let mut quadranttop = true;
-    let mut quadrantright = false;
-    let mut j = 0;
-
-    for i in 0 .. CIRCLE_SAMPLES {
-        let x = if quadrantright { CIRCLE_X[j] } else { -CIRCLE_X[j] };
-        let y = if quadranttop { -CIRCLE_Y[j] } else { CIRCLE_Y[j] };
-        unsafe {
-            circle_offsets[i] = x as i32 + y as i32 * display::V_WIDTH as i32;
-        }
-
-        match i {
-            34  => quadrantright = true,
-            68  => quadranttop = false,
-            102 => quadrantright = false,
-            _   => ()
-        }
-
-        if quadrantright && quadranttop || !quadrantright && !quadranttop {
-            j -= 1;
-        } else {
-            j += 1;
-        }
-    }
-}
-
-fn clear_circle(circle: &Circle) {
-    let buf = display::frame_buffer::<u16>();
-
-    for i in 0 .. CIRCLE_SAMPLES {
-        let idx = unsafe { circle.center as i32 + circle_offsets[i] } as usize;
-        if idx > 0 {
-            buf[idx] = 0;
-        }
-    }
-}
-
-fn draw_circle(circle: &Circle) {
-    let buf = display::frame_buffer::<u16>();
-    let mut color = circle.color;
-
-    for i in 0 .. CIRCLE_SAMPLES {
-        let idx = unsafe { circle.center as i32 + circle_offsets[i] } as usize;
-        if idx > 0 {
-            buf[idx] = color;
-            color += 32;
-        }
-    }
-}
 
 fn increment_color(circle: &mut Circle, default: u16) {
     circle.color += 32;
@@ -447,21 +390,7 @@ fn update_obstacle<R: Rng>(env: &mut GameEnv, rng: &mut R) {
         env.obstacle = generate_obstacle(rng);
     }
 
-    let mut buf = display::frame_buffer::<u16>();
-    for i in 0 .. display::WIDTH as usize {
-        if env.obstacle.obstacle[i] {
-            buf[env.obstacle.pos + i] = 63488;
-            if env.obstacle.pos >= 600 {
-                buf[env.obstacle.pos + i - display::V_WIDTH as usize] = 57344;
-            }
-            if env.obstacle.pos >= 1200 {
-                buf[env.obstacle.pos + i - 2 * display::V_WIDTH as usize] = 63;
-            }
-            if env.obstacle.pos >= 2000 {
-                buf[env.obstacle.pos + i - 3 * display::V_WIDTH as usize] = 0;
-            }
-        }
-    }
+    display::draw_obstacle(&env.obstacle);
 }
 
 #[no_mangle]

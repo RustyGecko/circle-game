@@ -1,5 +1,6 @@
 use kits::dk::bsp;
 
+use core::intrinsics::{volatile_load, volatile_store};
 static mut ms_ticks: u32 = 0;
 
 extern {
@@ -9,15 +10,16 @@ extern {
 #[no_mangle]
 #[allow(non_snake_case)]
 pub unsafe extern fn SysTick_Handler() {
-    ms_ticks += 1;
+    let ticks = volatile_load(&ms_ticks as *const u32) + 1;
+    volatile_store(&mut ms_ticks as *mut u32, ticks);
 
-    on_systick(ms_ticks);
+    on_systick(ticks);
 }
 
 pub fn delay(num_ticks: u32) {
     unsafe {
-        let cur_ticks = ms_ticks;
-        while (ms_ticks - cur_ticks) < num_ticks {}
+        let cur_ticks = volatile_load(&ms_ticks as *const u32);
+        while volatile_load(&ms_ticks as *const u32) - cur_ticks < num_ticks {}
     }
 }
 
